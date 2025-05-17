@@ -1,0 +1,14 @@
+/* Styling for the link to look like a button */
+.button-link {
+  display: inline-block;
+  padding: 10px 20px;
+  background-color: #007BFF;
+  color: white;
+  text-decoration: none; /* Removes underline */
+  border-radius: 4px;
+  text-align: center;
+}
+
+.button-link:hover {
+  background-color: #0056b3; /* Darken the color on hover */
+}
