@@ -34,7 +34,7 @@ app.use(session({
     resave: false,
     saveUninitialized: false,
     cookie: {
-        maxAge: 3600000, // 1 hour being loged in 
+        maxAge: 3600000,
         httpOnly: true,
         secure: false
     }
@@ -71,9 +71,8 @@ const calculateParkingFee = (vehicleSize, packageName, entryTime) => {
     const basePrice = PRICING[size][pkg];
     const hoursParked = moment().diff(moment(entryTime), 'hours');
     
-    // Example: Charge per hour after first hour
     if (hoursParked > 1) {
-        return basePrice + ((hoursParked - 1) * (basePrice * 0.2)); // 20% of base price per extra hour
+        return basePrice + ((hoursParked - 1) * (basePrice * 0.2));
     }
     
     return basePrice;
@@ -135,13 +134,10 @@ app.get('/api/auth/session', (req, res) => {
     }
 });
 
-// ==================== Account Creation Endpoint ==================== //
-
-// Create new account
+// Register
 app.post('/api/auth/register', (req, res) => {
     const { Username, password, confirmPassword } = req.body;
     
-    // Validate input
     if (!Username || !password || !confirmPassword) {
         return res.status(400).json({ 
             success: false, 
@@ -163,7 +159,6 @@ app.post('/api/auth/register', (req, res) => {
         });
     }
     
-    // Check if username already exists
     db.query('SELECT * FROM users WHERE Username = ?', [Username], (err, result) => {
         if (err) {
             console.error(err);
@@ -180,7 +175,6 @@ app.post('/api/auth/register', (req, res) => {
             });
         }
         
-        // Create new user
         db.query(
             'INSERT INTO users (Username, password) VALUES (?, ?)',
             [Username, password],
@@ -197,7 +191,7 @@ app.post('/api/auth/register', (req, res) => {
                     success: true, 
                     message: 'Account created successfully. Redirecting to login...',
                     redirect: true,
-                    redirectDelay: 2000, // 2 seconds
+                    redirectDelay: 2000,
                     redirectTo: '/login' 
                 });
             }
@@ -208,7 +202,6 @@ app.post('/api/auth/register', (req, res) => {
 // ==================== Vehicle Endpoints ==================== //
 
 // Add vehicle
-// Add vehicle with entry time
 app.post('/api/vehicles', (req, res) => {
     if (!req.session.user) {
         return res.status(401).json({ success: false, message: 'Not authenticated' });
@@ -217,7 +210,6 @@ app.post('/api/vehicles', (req, res) => {
     const { license_plate, vehicle_type, vehicle_size, ownername, ownerphone } = req.body;
     const entry_time = moment().format('YYYY-MM-DD HH:mm:ss');
     
-    // Validate vehicle size
     if (!['small', 'medium', 'big'].includes(vehicle_size.toLowerCase())) {
         return res.status(400).json({ 
             success: false, 
@@ -293,7 +285,7 @@ app.post('/api/vehicles/:id/exit', (req, res) => {
 
 // Get all vehicles
 app.get('/api/vehicles', (req, res) => {
-    db.query('SELECT * FROM vehicles', (err, result) => {
+    db.query('SELECT * FROM vehicles ORDER BY entry_time DESC', (err, result) => {
         if (err) {
             console.error(err);
             return res.status(500).json({ success: false, message: 'Failed to fetch vehicles' });
@@ -317,6 +309,41 @@ app.get('/api/vehicles/:id', (req, res) => {
         }
         
         res.json({ success: true, vehicle: result[0] });
+    });
+});
+
+// Get vehicle status (improved)
+app.get('/api/vehicles/:id/status', (req, res) => {
+    const { id } = req.params;
+    
+    db.query(`
+        SELECT 
+            payment_status,
+            CASE 
+                WHEN exit_time IS NULL THEN 'in_bay'
+                ELSE 'exited'
+            END as bay_status,
+            entry_time,
+            exit_time
+        FROM vehicles 
+        WHERE vehicle_id = ?
+    `, [id], (err, result) => {
+        if (err) {
+            console.error(err);
+            return res.status(500).json({ success: false, message: 'Database error' });
+        }
+        
+        if (result.length === 0) {
+            return res.status(404).json({ success: false, message: 'Vehicle not found' });
+        }
+        
+        res.json({ 
+            success: true, 
+            payment_status: result[0].payment_status,
+            bay_status: result[0].bay_status,
+            entry_time: result[0].entry_time,
+            exit_time: result[0].exit_time
+        });
     });
 });
 
@@ -369,6 +396,47 @@ app.delete('/api/vehicles/:id', (req, res) => {
     });
 });
 
+// Get active vehicles
+app.get('/api/vehicles/active', (req, res) => {
+    db.query('SELECT * FROM vehicles WHERE exit_time IS NULL ORDER BY entry_time DESC', (err, result) => {
+        if (err) {
+            console.error(err);
+            return res.status(500).json({ success: false, message: 'Failed to fetch active vehicles' });
+        }
+        res.json({ success: true, vehicles: result });
+    });
+});
+
+// Get vehicle history
+app.get('/api/vehicles/:id/history', (req, res) => {
+    const { id } = req.params;
+    
+    db.query(`
+        SELECT 
+            v.*, 
+            TIMESTAMPDIFF(MINUTE, entry_time, IFNULL(exit_time, NOW())) as minutes_in_bay,
+            p.amount, p.payment_date, pk.package_name
+        FROM vehicles v
+        LEFT JOIN payments p ON v.vehicle_id = p.vehicle_id
+        LEFT JOIN packages pk ON p.package_id = pk.pack_id
+        WHERE v.vehicle_id = ?
+        ORDER BY entry_time DESC`,
+        [id],
+        (err, result) => {
+            if (err) {
+                console.error(err);
+                return res.status(500).json({ success: false, message: 'Database error' });
+            }
+            
+            if (result.length === 0) {
+                return res.status(404).json({ success: false, message: 'Vehicle not found' });
+            }
+            
+            res.json({ success: true, history: result });
+        }
+    );
+});
+
 // ==================== Package Endpoints ==================== //
 
 // Get all packages
@@ -379,7 +447,6 @@ app.get('/api/packages', (req, res) => {
             return res.status(500).json({ success: false, message: 'Failed to fetch packages' });
         }
         
-        // Add pricing information to the response
         const packagesWithPricing = result.map(pkg => ({
             ...pkg,
             pricing: {
@@ -396,7 +463,6 @@ app.get('/api/packages', (req, res) => {
 // ==================== Payment Endpoints ==================== //
 
 // Create payment
-//  payment endpoint
 app.post('/api/payments', (req, res) => {
     if (!req.session.user) {
         return res.status(401).json({ success: false, message: 'Not authenticated' });
@@ -406,7 +472,6 @@ app.post('/api/payments', (req, res) => {
     const payment_date = moment().format('YYYY-MM-DD HH:mm:ss');
     const User_Id = req.session.user.userId;
     
-    // Start transaction
     db.beginTransaction(err => {
         if (err) {
             return res.status(500).json({ 
@@ -415,7 +480,6 @@ app.post('/api/payments', (req, res) => {
             });
         }
         
-        // First get vehicle details with entry time
         db.query(`
             SELECT v.vehicle_size, v.entry_time, p.package_name 
             FROM vehicles v, packages p 
@@ -444,7 +508,6 @@ app.post('/api/payments', (req, res) => {
                 try {
                     const amount = calculateParkingFee(vehicle_size, package_name);
                     
-                    // Insert payment with entry and exit times
                     db.query(
                         'INSERT INTO payments (vehicle_id, amount, payment_date, package_id, User_Id, entry_time, exit_time) VALUES (?, ?, ?, ?, ?, ?, ?)',
                         [vehicle_id, amount, payment_date, package_id, User_Id, entry_time, exit_time],
@@ -459,7 +522,6 @@ app.post('/api/payments', (req, res) => {
                                 });
                             }
                             
-                            // Update vehicle status and exit time
                             db.query(
                                 'UPDATE vehicles SET payment_status = "paid", exit_time = ? WHERE vehicle_id = ?',
                                 [exit_time, vehicle_id],
@@ -474,7 +536,6 @@ app.post('/api/payments', (req, res) => {
                                         });
                                     }
                                     
-                                    // Commit transaction
                                     db.commit(err => {
                                         if (err) {
                                             return db.rollback(() => {
@@ -512,30 +573,15 @@ app.post('/api/payments', (req, res) => {
         );
     });
 });
-app.get('/api/vehicles/:id/status', (req, res) => {
-    const { id } = req.params;
-    
-    db.query('SELECT payment_status FROM vehicles WHERE vehicle_id = ?', [id], (err, result) => {
-        if (err) {
-            console.error(err);
-            return res.status(500).json({ success: false, message: 'Database error' });
-        }
-        
-        if (result.length === 0) {
-            return res.status(404).json({ success: false, message: 'Vehicle not found' });
-        }
-        
-        res.json({ success: true, status: result[0].payment_status });
-    });
-});
 
-// Get all payments
+// Get all payments (with improved filtering)
 app.get('/api/payments', (req, res) => {
-    const { startDate, endDate, vehicleId } = req.query;
+    const { startDate, endDate, vehicleId, paymentStatus } = req.query;
     
     let query = `
         SELECT p.*, v.license_plate, v.vehicle_type, v.vehicle_size, 
-               v.ownername, v.ownerphone, pk.package_name, u.Username as cashier
+               v.ownername, v.ownerphone, v.payment_status,
+               pk.package_name, u.Username as cashier
         FROM payments p
         JOIN vehicles v ON p.vehicle_id = v.vehicle_id
         JOIN packages pk ON p.package_id = pk.pack_id
@@ -555,6 +601,11 @@ app.get('/api/payments', (req, res) => {
         queryParams.push(vehicleId);
     }
     
+    if (paymentStatus) {
+        conditions.push('v.payment_status = ?');
+        queryParams.push(paymentStatus);
+    }
+    
     if (conditions.length > 0) {
         query += ' WHERE ' + conditions.join(' AND ');
     }
@@ -572,47 +623,6 @@ app.get('/api/payments', (req, res) => {
         
         res.json({ success: true, payments: result });
     });
-});
-
-// Get currently active vehicles (in the washing bay)
-app.get('/api/vehicles/active', (req, res) => {
-    db.query('SELECT * FROM vehicles WHERE exit_time IS NULL', (err, result) => {
-        if (err) {
-            console.error(err);
-            return res.status(500).json({ success: false, message: 'Failed to fetch active vehicles' });
-        }
-        res.json({ success: true, vehicles: result });
-    });
-});
-
-// Get vehicle history with time spent
-app.get('/api/vehicles/:id/history', (req, res) => {
-    const { id } = req.params;
-    
-    db.query(`
-        SELECT 
-            v.*, 
-            TIMESTAMPDIFF(MINUTE, entry_time, IFNULL(exit_time, NOW())) as minutes_in_bay,
-            p.amount, p.payment_date, pk.package_name
-        FROM vehicles v
-        LEFT JOIN payments p ON v.vehicle_id = p.vehicle_id
-        LEFT JOIN packages pk ON p.package_id = pk.pack_id
-        WHERE v.vehicle_id = ?
-        ORDER BY entry_time DESC`,
-        [id],
-        (err, result) => {
-            if (err) {
-                console.error(err);
-                return res.status(500).json({ success: false, message: 'Database error' });
-            }
-            
-            if (result.length === 0) {
-                return res.status(404).json({ success: false, message: 'Vehicle not found' });
-            }
-            
-            res.json({ success: true, history: result });
-        }
-    );
 });
 
 // ==================== Report Endpoints ==================== //
@@ -657,45 +667,6 @@ app.get('/api/reports/daily-summary', (req, res) => {
     });
 });
 
-// Time-based analysis report
-app.get('/api/reports/time-analysis', (req, res) => {
-    const { startDate, endDate } = req.query;
-    
-    let query = `
-        SELECT 
-            v.vehicle_type,
-            AVG(TIMESTAMPDIFF(MINUTE, p.entry_time, p.exit_time)) as avg_time_minutes,
-            COUNT(*) as total_vehicles
-        FROM payments p
-        JOIN vehicles v ON p.vehicle_id = v.vehicle_id
-    `;
-    
-    const queryParams = [];
-    
-    if (startDate && endDate) {
-        query += ' WHERE p.payment_date BETWEEN ? AND ?';
-        queryParams.push(startDate, endDate);
-    }
-    
-    query += ' GROUP BY v.vehicle_type ORDER BY avg_time_minutes DESC';
-    
-    db.query(query, queryParams, (err, result) => {
-        if (err) {
-            console.error(err);
-            return res.status(500).json({ 
-                success: false, 
-                message: 'Failed to generate time analysis report' 
-            });
-        }
-        
-        res.json({ 
-            success: true, 
-            startDate,
-            endDate,
-            report: result 
-        });
-    });
-});
 // Vehicle type summary report
 app.get('/api/reports/vehicle-type-summary', (req, res) => {
     const { startDate, endDate } = req.query;
@@ -736,10 +707,48 @@ app.get('/api/reports/vehicle-type-summary', (req, res) => {
     });
 });
 
+// Time analysis report
+app.get('/api/reports/time-analysis', (req, res) => {
+    const { startDate, endDate } = req.query;
+    
+    let query = `
+        SELECT 
+            v.vehicle_type,
+            AVG(TIMESTAMPDIFF(MINUTE, p.entry_time, p.exit_time)) as avg_time_minutes,
+            COUNT(*) as total_vehicles
+        FROM payments p
+        JOIN vehicles v ON p.vehicle_id = v.vehicle_id
+    `;
+    
+    const queryParams = [];
+    
+    if (startDate && endDate) {
+        query += ' WHERE p.payment_date BETWEEN ? AND ?';
+        queryParams.push(startDate, endDate);
+    }
+    
+    query += ' GROUP BY v.vehicle_type ORDER BY avg_time_minutes DESC';
+    
+    db.query(query, queryParams, (err, result) => {
+        if (err) {
+            console.error(err);
+            return res.status(500).json({ 
+                success: false, 
+                message: 'Failed to generate time analysis report' 
+            });
+        }
+        
+        res.json({ 
+            success: true, 
+            startDate,
+            endDate,
+            report: result 
+        });
+    });
+});
+
 // Start server
 const PORT = 8000;
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
 });
-
-
