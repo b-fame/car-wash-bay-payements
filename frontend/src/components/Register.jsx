@@ -1,25 +1,20 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 
-const Register = () => {
+const Register = ({ onSwitchToLogin }) => {
   const [formData, setFormData] = useState({
-    Username: '',
+    username: '',
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
+    full_name: '',
+    email: ''
   });
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
 
   const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
+    setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
   const handleSubmit = async (e) => {
@@ -36,126 +31,117 @@ const Register = () => {
       setError('Password must be at least 6 characters');
       return;
     }
-
+    
     setLoading(true);
-
     try {
-      const response = await axios.post('http://localhost:8000/api/auth/register', formData);
-      
-      if (response.data.success) {
-        setSuccess('Account created successfully! Redirecting to login...');
-        setTimeout(() => navigate('/login'), 2000);
-      }
-    } catch (error) {
-      setError(error.response?.data?.message || 'Registration failed. Please try again.');
+      await axios.post('/api/auth/register', {
+        username: formData.username,
+        password: formData.password,
+        full_name: formData.full_name,
+        email: formData.email
+      });
+      setSuccess('Account created successfully! Redirecting to login...');
+      setTimeout(() => {
+        if (onSwitchToLogin) onSwitchToLogin();
+      }, 2000);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Registration failed');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8 bg-white p-8 rounded-lg shadow-md">
-        <div>
-          <h2 className="text-center text-3xl font-extrabold text-gray-900">
-            Create Account
-          </h2>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-500 to-purple-600">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-8">
+        <div className="text-center mb-6">
+          <div className="text-5xl mb-2">🚗</div>
+          <h2 className="text-2xl font-bold text-gray-800">Create Account</h2>
+          <p className="text-gray-600 mt-1">Join Car Wash Bay System</p>
         </div>
-
+        
         {error && (
-          <div className="rounded-md bg-red-50 p-4">
-            <div className="text-sm text-red-700">{error}</div>
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+            {error}
           </div>
         )}
-
+        
         {success && (
-          <div className="rounded-md bg-green-50 p-4">
-            <div className="text-sm text-green-700">{success}</div>
+          <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
+            {success}
           </div>
         )}
-
-        <form className="mt-8 space-y-4" onSubmit={handleSubmit}>
-          <div>
-            <label htmlFor="Username" className="block text-sm font-medium text-gray-700">
-              Username
-            </label>
+        
+        <form onSubmit={handleSubmit}>
+          <div className="mb-3">
             <input
-              id="Username"
-              name="Username"
               type="text"
-              required
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              value={formData.Username}
+              name="username"
+              placeholder="Username *"
+              value={formData.username}
               onChange={handleChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              required
             />
           </div>
-
-          <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-              Password
-            </label>
-            <div className="mt-1 relative">
-              <input
-                id="password"
-                name="password"
-                type={showPassword ? "text" : "password"}
-                required
-                className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                value={formData.password}
-                onChange={handleChange}
-              />
-              <button
-                type="button"
-                className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                onClick={() => setShowPassword(!showPassword)}
-              >
-                {showPassword ? '👁️' : '🔒'}
-              </button>
-            </div>
+          <div className="mb-3">
+            <input
+              type="text"
+              name="full_name"
+              placeholder="Full Name"
+              value={formData.full_name}
+              onChange={handleChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
           </div>
-
-          <div>
-            <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
-              Confirm Password
-            </label>
-            <div className="mt-1 relative">
-              <input
-                id="confirmPassword"
-                name="confirmPassword"
-                type={showConfirmPassword ? "text" : "password"}
-                required
-                className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                value={formData.confirmPassword}
-                onChange={handleChange}
-              />
-              <button
-                type="button"
-                className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-              >
-                {showConfirmPassword ? '👁️' : '🔒'}
-              </button>
-            </div>
+          <div className="mb-3">
+            <input
+              type="email"
+              name="email"
+              placeholder="Email"
+              value={formData.email}
+              onChange={handleChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
           </div>
-
-          <div>
-            <button
-              type="submit"
-              disabled={loading}
-              className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${
-                loading ? 'bg-gray-400' : 'bg-blue-600 hover:bg-blue-700'
-              } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500`}
-            >
-              {loading ? 'Creating account...' : 'Register'}
-            </button>
+          <div className="mb-3">
+            <input
+              type="password"
+              name="password"
+              placeholder="Password *"
+              value={formData.password}
+              onChange={handleChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              required
+            />
           </div>
+          <div className="mb-4">
+            <input
+              type="password"
+              name="confirmPassword"
+              placeholder="Confirm Password *"
+              value={formData.confirmPassword}
+              onChange={handleChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              required
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
+          >
+            {loading ? 'Creating...' : 'Register'}
+          </button>
         </form>
-
-        <div className="text-center text-sm text-gray-600">
-          Already have an account?{' '}
-          <Link to="/login" className="font-medium text-blue-600 hover:text-blue-500">
-            Sign in
-          </Link>
+        
+        <div className="mt-4 text-center">
+          <button
+            onClick={onSwitchToLogin}
+            className="text-blue-600 hover:underline text-sm"
+          >
+            Already have an account? Login
+          </button>
         </div>
       </div>
     </div>

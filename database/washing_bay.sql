@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: May 17, 2025 at 12:43 PM
+-- Generation Time: Apr 20, 2026 at 11:52 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -24,6 +24,30 @@ SET time_zone = "+00:00";
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `activity_logs`
+--
+
+CREATE TABLE `activity_logs` (
+  `log_id` int(11) NOT NULL,
+  `user_id` int(11) NOT NULL,
+  `action` varchar(255) NOT NULL,
+  `details` text DEFAULT NULL,
+  `ip_address` varchar(45) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `activity_logs`
+--
+
+INSERT INTO `activity_logs` (`log_id`, `user_id`, `action`, `details`, `ip_address`, `created_at`) VALUES
+(1, 4, 'LOGIN', 'User logged in', '::1', '2026-04-20 09:42:47'),
+(2, 4, 'ADD_VEHICLE', 'Added vehicle RAC203B', '::1', '2026-04-20 09:43:17'),
+(3, 4, 'RECORD_PAYMENT', 'Payment of 2000 for vehicle RAC203B', '::1', '2026-04-20 09:43:33');
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `packages`
 --
 
@@ -31,7 +55,7 @@ CREATE TABLE `packages` (
   `pack_id` int(11) NOT NULL,
   `package_name` varchar(50) NOT NULL,
   `fee_charged` decimal(10,2) NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
 -- Dumping data for table `packages`
@@ -52,17 +76,19 @@ CREATE TABLE `payments` (
   `payment_id` int(11) NOT NULL,
   `vehicle_id` int(11) NOT NULL,
   `amount` decimal(10,2) NOT NULL,
-  `payment_date` datetime NOT NULL,
+  `payment_date` datetime NOT NULL DEFAULT current_timestamp(),
   `package_id` int(11) NOT NULL,
-  `User_Id` int(11) NOT NULL,
-  `entry_time` datetime DEFAULT NULL,
-  `exit_time` datetime DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+  `user_id` int(11) NOT NULL,
+  `entry_time` datetime NOT NULL,
+  `exit_time` datetime NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
 -- Dumping data for table `payments`
 --
 
+INSERT INTO `payments` (`payment_id`, `vehicle_id`, `amount`, `payment_date`, `package_id`, `user_id`, `entry_time`, `exit_time`) VALUES
+(1, 1, 2000.00, '2026-04-20 11:43:33', 2, 4, '2026-04-20 11:43:17', '2026-04-20 11:43:32');
 
 -- --------------------------------------------------------
 
@@ -71,17 +97,26 @@ CREATE TABLE `payments` (
 --
 
 CREATE TABLE `users` (
-  `UserId` int(11) NOT NULL,
-  `Username` varchar(50) NOT NULL,
-  `password` varchar(50) NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+  `user_id` int(11) NOT NULL,
+  `username` varchar(50) NOT NULL,
+  `password` varchar(255) NOT NULL,
+  `email` varchar(100) DEFAULT NULL,
+  `full_name` varchar(100) DEFAULT NULL,
+  `role` enum('admin','cashier','manager') DEFAULT 'cashier',
+  `is_active` tinyint(1) DEFAULT 1,
+  `last_login` datetime DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
 -- Dumping data for table `users`
 --
 
-INSERT INTO `users` (`UserId`, `Username`, `password`) VALUES
-(1, 'admin', '123'),
+INSERT INTO `users` (`user_id`, `username`, `password`, `email`, `full_name`, `role`, `is_active`, `last_login`, `created_at`) VALUES
+(1, 'admin', '$2b$10$YourHashedPassword', 'admin@washbay.com', 'System Administrator', 'admin', 1, NULL, '2026-04-20 08:29:35'),
+(2, 'cashier1', '$2b$10$YourHashedPassword', 'cashier@washbay.com', 'John Cashier', 'cashier', 1, NULL, '2026-04-20 08:29:35'),
+(3, 'manager1', '$2b$10$YourHashedPassword', 'manager@washbay.com', 'Sarah Manager', 'manager', 1, NULL, '2026-04-20 08:29:35'),
+(4, 'bfame', '$2b$10$X7lJTp2Wv2MqbV8wYpUk7OSKC/Vg6xU65mTxm8Lcn1UexFAhnvjhi', 'blaisefam5242@gmail.com', 'Blaise fame', 'cashier', 1, '2026-04-20 11:42:47', '2026-04-20 09:42:32');
 
 -- --------------------------------------------------------
 
@@ -96,18 +131,29 @@ CREATE TABLE `vehicles` (
   `vehicle_size` enum('small','medium','big') NOT NULL,
   `ownername` varchar(100) NOT NULL,
   `ownerphone` varchar(20) NOT NULL,
-  `entry_time` datetime DEFAULT NULL,
+  `entry_time` datetime NOT NULL,
   `exit_time` datetime DEFAULT NULL,
-  `payment_status` enum('paid','unpaid') DEFAULT 'unpaid'
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+  `payment_status` enum('paid','unpaid') DEFAULT 'unpaid',
+  `created_by` int(11) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
 -- Dumping data for table `vehicles`
 --
 
--
+INSERT INTO `vehicles` (`vehicle_id`, `license_plate`, `vehicle_type`, `vehicle_size`, `ownername`, `ownerphone`, `entry_time`, `exit_time`, `payment_status`, `created_by`) VALUES
+(1, 'RAC203B', 'Lamborgin', 'small', 'Fame', '0793088240', '2026-04-20 11:43:17', '2026-04-20 11:43:32', 'paid', 4);
+
+--
 -- Indexes for dumped tables
 --
+
+--
+-- Indexes for table `activity_logs`
+--
+ALTER TABLE `activity_logs`
+  ADD PRIMARY KEY (`log_id`),
+  ADD KEY `user_id` (`user_id`);
 
 --
 -- Indexes for table `packages`
@@ -122,25 +168,33 @@ ALTER TABLE `payments`
   ADD PRIMARY KEY (`payment_id`),
   ADD KEY `vehicle_id` (`vehicle_id`),
   ADD KEY `package_id` (`package_id`),
-  ADD KEY `User_Id` (`User_Id`);
+  ADD KEY `user_id` (`user_id`);
 
 --
 -- Indexes for table `users`
 --
 ALTER TABLE `users`
-  ADD PRIMARY KEY (`UserId`),
-  ADD UNIQUE KEY `Username` (`Username`);
+  ADD PRIMARY KEY (`user_id`),
+  ADD UNIQUE KEY `username` (`username`),
+  ADD UNIQUE KEY `idx_username` (`username`);
 
 --
 -- Indexes for table `vehicles`
 --
 ALTER TABLE `vehicles`
   ADD PRIMARY KEY (`vehicle_id`),
-  ADD UNIQUE KEY `license_plate` (`license_plate`);
+  ADD UNIQUE KEY `license_plate` (`license_plate`),
+  ADD KEY `created_by` (`created_by`);
 
 --
 -- AUTO_INCREMENT for dumped tables
 --
+
+--
+-- AUTO_INCREMENT for table `activity_logs`
+--
+ALTER TABLE `activity_logs`
+  MODIFY `log_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
 -- AUTO_INCREMENT for table `packages`
@@ -152,31 +206,43 @@ ALTER TABLE `packages`
 -- AUTO_INCREMENT for table `payments`
 --
 ALTER TABLE `payments`
-  MODIFY `payment_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `payment_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `UserId` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+  MODIFY `user_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
 -- AUTO_INCREMENT for table `vehicles`
 --
 ALTER TABLE `vehicles`
-  MODIFY `vehicle_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `vehicle_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
 -- Constraints for dumped tables
 --
 
 --
+-- Constraints for table `activity_logs`
+--
+ALTER TABLE `activity_logs`
+  ADD CONSTRAINT `activity_logs_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`);
+
+--
 -- Constraints for table `payments`
 --
 ALTER TABLE `payments`
-  ADD CONSTRAINT `payments_ibfk_1` FOREIGN KEY (`vehicle_id`) REFERENCES `vehicles` (`vehicle_id`),
+  ADD CONSTRAINT `payments_ibfk_1` FOREIGN KEY (`vehicle_id`) REFERENCES `vehicles` (`vehicle_id`) ON DELETE CASCADE,
   ADD CONSTRAINT `payments_ibfk_2` FOREIGN KEY (`package_id`) REFERENCES `packages` (`pack_id`),
-  ADD CONSTRAINT `payments_ibfk_3` FOREIGN KEY (`User_Id`) REFERENCES `users` (`UserId`);
+  ADD CONSTRAINT `payments_ibfk_3` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`);
+
+--
+-- Constraints for table `vehicles`
+--
+ALTER TABLE `vehicles`
+  ADD CONSTRAINT `vehicles_ibfk_1` FOREIGN KEY (`created_by`) REFERENCES `users` (`user_id`);
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
